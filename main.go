@@ -98,7 +98,16 @@ func main() {
 
 		coll := client.Database("demo").Collection("line")
 
-		cursor, err := coll.Find(context.TODO(), bson.D{{"user", jsonData.User}})
+		var filter bson.D
+		if jsonData.User == "" || jsonData.User == "*" {
+			// query all
+			filter = bson.D{}
+		} else {
+			// query selected user
+			filter = bson.D{{"user", jsonData.User}}
+		}
+
+		cursor, err := coll.Find(context.TODO(), filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": err.Error(),
