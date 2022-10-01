@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,9 +10,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/line/line-bot-sdk-go/v7/linebot"
 	"github.com/spf13/viper"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+type UserMessage struct {
+	User    string `json:"user"`
+	Message string `json:"message"`
+}
 
 func main() {
 
@@ -51,6 +58,81 @@ func main() {
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
+		})
+	})
+
+	r.POST("/save", func(c *gin.Context) {
+
+		var jsonData UserMessage
+		err := c.BindJSON(&jsonData)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": err.Error(),
+			})
+		}
+
+		coll := client.Database("demo").Collection("line")
+
+		doc := bson.D{{"user", jsonData.User}, {"message", jsonData.Message}}
+		result, err := coll.InsertOne(context.TODO(), doc)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": err.Error(),
+			})
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"result": result,
+		})
+	})
+
+	r.POST("/query", func(c *gin.Context) {
+
+		var jsonData UserMessage
+		err := c.BindJSON(&jsonData)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": err.Error(),
+			})
+		}
+
+		coll := client.Database("demo").Collection("line")
+
+		cursor, err := coll.Find(context.TODO(), bson.D{{"user", jsonData.User}})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": err.Error(),
+			})
+		}
+
+		var results []bson.M
+		if err = cursor.All(context.TODO(), &results); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": err.Error(),
+			})
+		}
+
+		var userMessages []UserMessage
+		for _, result := range results {
+			output, err := json.Marshal(result)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"message": err.Error(),
+				})
+			}
+			var userMessage UserMessage
+			err = json.Unmarshal(output, &userMessage)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"message": err.Error(),
+				})
+			}
+
+			userMessages = append(userMessages, userMessage)
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"result": userMessages,
 		})
 	})
 
