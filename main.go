@@ -159,9 +159,17 @@ func main() {
 				case *linebot.TextMessage:
 					fmt.Printf("%v", message)
 					messageResponse = message.Text
-					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(message.Text)).Do(); err != nil {
-						log.Print(err)
+
+					coll := client.Database("demo").Collection("line")
+
+					doc := bson.D{{"user", event.Source.UserID}, {"message", message.Text}}
+					_, err := coll.InsertOne(context.TODO(), doc)
+					if err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{
+							"message": err.Error(),
+						})
 					}
+
 				}
 			}
 		}
