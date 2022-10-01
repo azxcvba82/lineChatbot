@@ -170,6 +170,12 @@ func main() {
 						})
 					}
 
+					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(message.Text)).Do(); err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{
+							"message": err.Error(),
+						})
+					}
+
 				}
 			}
 		}
@@ -177,6 +183,31 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{
 			"message": messageResponse,
 		})
+	})
+
+	r.POST("/send", func(c *gin.Context) {
+
+		var jsonData UserMessage
+		err := c.BindJSON(&jsonData)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": err.Error(),
+			})
+		}
+
+		var users []string
+
+		users = append(users, jsonData.User)
+		if result, err := bot.Multicast(users, linebot.NewTextMessage(jsonData.Message)).Do(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": err.Error(),
+			})
+		} else {
+			c.JSON(http.StatusOK, gin.H{
+				"result": result,
+			})
+		}
+
 	})
 
 	r.Run(viper.GetString("port")) // listen and serve on 0.0.0.0:80 (for windows "localhost:80")
